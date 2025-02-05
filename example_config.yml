@@ -1,0 +1,48 @@
+# =============================================================================
+# Basic configuration
+# =============================================================================
+# Elevation angle that is considered as "zenith" in degree
+zenith_elevation: 90.0
+
+# Elevation angle range (degree, [minimum, maximum])
+classification_elev_range: [1.0, 90.]
+
+# List of elevation angles (degree) to ignore (optional)
+# ignore_elev: 
+
+# Normalization value of the CI (optional), can be determined by running
+# normalize_ci(..). If this value is set, normalize_ci(...) will just use this
+# value instead of running the normalization algorithm.
+# normalization_ci: 1.1 
+
+# Normalization value of the O4 (optional), can be determined by running
+# normalize_o4(..). If this value is set, normalize_o4(...) will just use this
+# value instead of running the normalization algorithm.
+# normalization_o4: 
+
+# Duration threshold from which a scan is marked as extraordinarilly
+# long (seconds). This value typically depends on the total integration time
+# of a single measurement and the number of elevations in a scan
+delta_time_scan: 1800
+# =============================================================================
+# Advanced configuration
+# =============================================================================
+# Solar zenith angle range considered for cloud classification
+# See FRM4DOAS D2.2 ATBD section 4
+classification_sza_range: [0., 75.]
+
+# Solar zenith angle range considered for spread calculation
+# See FRM4DOAS D2.2 ATBD table 3
+valid_spread_sza_range: [40., 90.]
+
+# Properties for color index normalization
+# See FRM4DOAS D2.2 ATBD section 2
+normalize_ci_sza_range: [0., 60.]
+normalize_ci_range: [0.0, 3.0]
+normalize_ci_bin_size: 0.02
+
+# Properties for O4 normalization
+# See FRM4DOAS D2.2 ATBD section 3
+normalize_o4_sza_range: [30., 50.]
+normalize_o4_range: [-3.0, 3.0]
+normalize_o4_bin_size: 0.01
