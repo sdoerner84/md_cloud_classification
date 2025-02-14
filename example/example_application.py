@@ -86,7 +86,7 @@ def load_mapa_converter_data(mapa_conv_fn):
 
 
 general_cfg_fn = 'example_config.yml'
-threshold_cfg_fn = 'default_thresholds.yml'
+threshold_cfg_fn = '../config/default_thresholds.yml'
 
 with open(general_cfg_fn, 'r') as cfg:
     config = yaml.load(cfg, Loader=yaml.SafeLoader)
