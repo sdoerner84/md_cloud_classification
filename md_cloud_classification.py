@@ -26,19 +26,17 @@ from toolbox import MDCCError, time_conversions as tc
 from toolbox.md_cloud_result import MDCloudResult
 
 
-def gauss(x, A0, A, mu, sigma):
+def gauss(x: float, A0: float, A: float, mu: float, sigma: float):
     '''
-    Gauss function for fitting.
+    Gauss function used for fitting in the MAX-DOAS cloud classification
+    calibration routine (color index CI and oxygen dimer O4).
     '''
     return A0 + A * np.exp(-((x - mu)**2 / (2. * sigma**2)))
 
 
-def get_daily_idc_before_after(dt, elev, inst_lon, select_elev):
+def get_daily_idc_before_after(dt: np.array, elev: np.array,
+                               inst_lon: np.array, select_elev: float):
     '''
-    QUESTIONS:
-    What if a scan has the same angle multiple times? Seems to be the case in
-    FRM4DOAS chain for CINDI3.
-    ---
     Assuming predefined sequences in all cases.
 
     Data variables:
@@ -285,7 +283,7 @@ class MAXDOASCloudClassification():
         # Filter all values outside of defined SZA range
         sza_filter = (sza_zenith < self.config['classification_sza_range'][0])
         sza_filter |= (sza_zenith > self.config['classification_sza_range'][1])
-        # sza_zenith[sza_filter] = np.nan
+        sza_zenith[sza_filter] = np.nan
         # Calculation of SZA dependent or constant thresholds
         # for a given data set
         th = {}
@@ -360,18 +358,12 @@ class MAXDOASCloudClassification():
             return self.config['normalization_ci']
         self.check_thresholds()
         self.check_shape(sza, elev, ci)
-        # Here, all zenith measurements can be used
-        # !!! conflict with threshold definition
-        # zenith_mask = elev == self.config['zenith_elevation']
+        # Select indices of zenith elevation measurements
         zenith_idc = get_idc(elev, self.config['zenith_elevation'], order='last')
         ci_norm = ci[zenith_idc] / self.thresholds['CI_MIN']
         norm_bin_range = tuple(self.config['normalize_ci_range'])
         norm_bin_size = self.config['normalize_ci_bin_size']
         norm_bins = np.arange(*norm_bin_range, norm_bin_size)
-        # INTENDED CHANGE TBD
-        # Before: bin edges used for fitting bin value, but should use center
-        # of bin as X value and bin_count as Y value.
-        # center_bins = norm_bins[:-1]
         center_bins = 0.5 * (norm_bins[:-1] + norm_bins[1:])
         # First gauss fit to clip filtered values
         sza_filter = (sza[zenith_idc] > self.config['normalize_ci_sza_range'][0])
@@ -393,7 +385,7 @@ class MAXDOASCloudClassification():
                                       [A0, A, mu, sigma])
         except RuntimeError:
             msg = 'Could not fit a gauss curve to the given frequency '
-            msg += 'distribtion of the color index. Please check radiance '
+            msg += 'distribution of the color index. Please check radiance '
             msg += 'values.'
             if plot_stream is not None:
                 plot_stream.savefig(fig, dpi=200, bbox_inches='tight')
@@ -445,13 +437,13 @@ class MAXDOASCloudClassification():
                 ax.axvline(center_bins[np.min(peaks[peak_filter])], color='r',
                            label=ci_norm_label)
         frac_below = np.sum(count_rel[center_bins < normalization_ci])
-        # INTENDED CHANGE: Use CI instead of 1 / CI as the found normalisation
-        # CI - it is much moreintuitive to see the same value as in the plots
-        # BUT REMEMBER TO devide by this value, instead of multiplying it.
+        # INTENDED CHANGE: Use CI instead of 1 / CI as the found normalization
+        # CI - it is much more intuitive to see the same value as in the plots
+        # BUT REMEMBER TO divide by this value, instead of multiplying it.
         self.config['normalization_ci'] = normalization_ci
         if verbose:
             calib_msg = 'Color index (CI) normalization value is '
-            calib_msg += f'{normalization_ci:.3f}\n Fraction of CI below the '
+            calib_msg += f'{normalization_ci:.3f}\nFraction of CI below the '
             calib_msg += f'threshold is {frac_below * 100:.2f}%.'
             self.print_log(calib_msg)
         if plot_stream is not None:
@@ -490,7 +482,7 @@ class MAXDOASCloudClassification():
         @verbose (default=False) if set True, normalization output will be
             printed
 
-        RETURNS o4 damf normalization value
+        RETURNS O4 DAMF normalization value
         '''
         if self.config['normalization_o4'] is not None:
             if verbose:
@@ -518,10 +510,6 @@ class MAXDOASCloudClassification():
         norm_bin_range = tuple(self.config['normalize_o4_range'])
         norm_bin_size = self.config['normalize_o4_bin_size']
         norm_bins = np.arange(*norm_bin_range, norm_bin_size)
-        # INTENDED CHANGE TBD
-        # Before: bin edges used for fitting bin value, but should use center
-        # of bin as X value and bin_count as Y value.
-        # center_bins = norm_bins[:-1]
         center_bins = 0.5 * (norm_bins[:-1] + norm_bins[1:])
         count_abs, _ = np.histogram(o4_damf_norm, norm_bins)
         count_rel = count_abs / np.sum(count_abs)
@@ -608,7 +596,8 @@ class MAXDOASCloudClassification():
           - 2016_paper: abs(ci_(i-1) + ci_(i+1) / 2 - ci_i)
           - 2024_validation: abs(ci_(i) - ci(i-1))
 
-        RETURNS tsi array with the same shape as the given ci data variable
+        RETURNS array of temporal smoothness indicator (TSI) with the same
+            shape as the given color index data variable (CI)
         '''
         if select_elev is None:
             select_elev = self.config['zenith_elevation']
@@ -643,8 +632,8 @@ class MAXDOASCloudClassification():
     def classify_ci_cloud(self, elev: np.array, ci: np.array,
                           dt: np.array, lon: np.array):
         '''
-        Perform cloud classification for type 1 to 5, purely based on color
-        index of zenith measurements.
+        Perform cloud classification for type 1 to 5 (see Wagner et al., 2014),
+        purely based on color index of zenith measurements.
 
         Requires gen_thresholds(...) to be run before.
 
@@ -665,8 +654,8 @@ class MAXDOASCloudClassification():
         nscans = elev.shape[0]
         zenith_idc = get_idc(elev, self.config['zenith_elevation'],
                              order='last')
+        # Apply the classification mask
         ci[self.classification_mask] *= np.nan
-        # ci[self.classification_mask] *= np.nan
         ci_scaled = ci[zenith_idc] / self.config['normalization_ci']
         # Calculate the spread only for those scans that contain
         # a zenith measurement
@@ -723,7 +712,7 @@ class MAXDOASCloudClassification():
                           o4_damf: np.array, cloud_type: MDCloudResult):
         '''
         Perform cloud classification for type 6 and 7 (thick clouds) using the
-        o4_damf retrieved from zenith measurements.
+        o4_damf retrieved from zenith measurements (see Wagner et al., 2016).
 
         Requires gen_thresholds(...) to be run before.
 

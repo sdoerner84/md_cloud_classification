@@ -10,32 +10,36 @@ class MDCloudResult():
     '''
     Class that holds all results of the MAX-DOAS cloud classification
     algorithm.
+
+    Comments behind each label refer to the definition of those categories in
+    Wagner et al., 2014 (https://doi.org/10.5194/amt-7-1289-2014)
+    Wagner et al., 2016 (https://doi.org/10.5194/amt-9-4803-2016)
+    Wagner et al., 2024 FRM4DOAS D2.2 ATBD
     '''
 
     def __init__(self, nscans):
         '''
         Initial result arrays with number of scans in the data set.
-
         @nscans
         '''
         self.nscans = nscans
         self.group_labels = {'main': 'Main categories (mutually exclusive)',
                              'sub': 'Sub categories',
                              'warn': 'Warnings'}
-        self.main_labels = ['clear sky low aerosol',    # index 0
-                            'clear sky high aerosol',   # index 1
-                            'cloud holes',              # index 2
-                            'broken clouds',            # index 3
-                            'continuous',               # index 4
+        self.main_labels = ['clear sky low aerosol',    # index 0 - type 1
+                            'clear sky high aerosol',   # index 1 - type 2
+                            'cloud holes',              # index 2 - type 3
+                            'broken clouds',            # index 3 - type 4
+                            'continuous',               # index 4 - type 5
                             'empty',                    # index 5
                             'empty',                    # index 6
                             'empty',                    # index 7
                             ]
         self.main = np.zeros((nscans, 8), dtype=int)
-        self.sub_labels = ['constantly clear',          # index 0
-                           'constantly cloudy',         # index 1
-                           'fog',                       # index 2
-                           'optically thick clouds',    # index 3
+        self.sub_labels = ['constantly clear',          # index 0 - new since ATBD
+                           'constantly cloudy',         # index 1 - new since ATBD
+                           'fog',                       # index 2 - type 6
+                           'optically thick clouds',    # index 3 - type 7
                            'empty',                     # index 4
                            'empty',                     # index 5
                            'empty',                     # index 6

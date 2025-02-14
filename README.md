@@ -1,4 +1,4 @@
-# md_cloud_classification
+# md_cloud_classification (MAX-DOAS Cloud Classification)
 Cloud identification algorithm using MAX-DOAS measurements developed in the framework of FRM4DOAS 2.0. It is based on
 Wagner et al., 2014 (https://doi.org/10.5194/amt-7-1289-2014)
 Wagner et al., 2016 (https://doi.org/10.5194/amt-9-4803-2016)

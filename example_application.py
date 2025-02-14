@@ -94,6 +94,8 @@ with open(general_cfg_fn, 'r') as cfg:
 with open(threshold_cfg_fn, 'r') as cfg:
     thresholds_config = yaml.load(cfg, Loader=yaml.SafeLoader)
 
+calibration_report_fn = r'D:\\test.pdf'
+
 # Provide a dictionary with a valid MAPA converter file here:
 datadir = r'D:\sziegler\studies\sziegler\cloud_classification\code_von_lucas\data'
 data_fns = file_tools.get_filelist(datadir, recursive=True,
@@ -101,7 +103,7 @@ data_fns = file_tools.get_filelist(datadir, recursive=True,
 data = load_mapa_converter_data(data_fns[0])
 
 cloud_class = MAXDOASCloudClassification(config, thresholds_config)
-with PdfPages('D:\\test.pdf') as pdfout:
+with PdfPages(calibration_report_fn) as pdfout:
     # Full controll which steps should be performed:
     cloud_class.gen_thresholds(data['sza'], data['elev'])
     cloud_class.set_classification_mask(data['sza'], data['elev'])
