@@ -22,8 +22,8 @@ from scipy.optimize import curve_fit
 from scipy.signal import find_peaks
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-from toolbox import MDCCError, time_conversions as tc
-from toolbox.md_cloud_result import MDCloudResult
+from md_cloud_classification.toolbox import MDCCError, time_conversions as tc
+from md_cloud_classification.toolbox.md_cloud_result import MDCloudResult
 
 
 def gauss(x: float, A0: float, A: float, mu: float, sigma: float):
