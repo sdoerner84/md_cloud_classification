@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "md_cloud_classification"
+license = {file = "LICENSE"}
+description = "MAX-DOAS cloud classification algorithm"
+dynamic = ["version"]
+authors = [
+    { name = "Steffen Ziegler", email = "Steffen.Ziegler@mpic.de" },
+    { name = "Lucas Reischmann", email = "l.reischmann@mpic.de" },
+]
+requires-python = ">=3.11"
+readme = "README.md"
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib"
+]
+
+# Only install md_cloud_classification and subpackages
+[tool.setuptools.packages.find]
+include = ["md_cloud_classification*"]
+
+# Dynamically getting the version number from the code
+[tool.setuptools.dynamic]
+version = {attr = "md_cloud_classification.__version__"}

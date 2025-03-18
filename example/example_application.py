@@ -17,7 +17,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import yaml
 from netCDF4 import Dataset
 from md_cloud_classification import MAXDOASCloudClassification
-from toolbox import file_tools
+from md_cloud_classification.toolbox import file_tools
 
 
 def frm4doasdate_to_datetime(fracday, year):
