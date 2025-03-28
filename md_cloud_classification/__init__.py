@@ -832,7 +832,7 @@ class MAXDOASCloudClassification():
         @verbose (default=False) if cloud classification output should be
             printed
 
-        RETURNS 2D-array cloud type [dimension of scans, 8]
+        RETURNS MDCloudResult object (see toolbox/md_cloud_result.py)
         '''
         self.check_shape(sza, elev, ci, o4_damf, dt, lon)
         self.gen_thresholds(sza, elev)
