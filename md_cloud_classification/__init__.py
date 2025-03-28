@@ -26,15 +26,15 @@ from md_cloud_classification.toolbox import MDCCError, time_conversions as tc
 from md_cloud_classification.toolbox.md_cloud_result import MDCloudResult
 
 
-__version__ = '1.0.2'
+__version__ = '1.0.3'
 
 
-def gauss(x: float, A0: float, A: float, mu: float, sigma: float):
+def gauss(x: float, offset: float, scale: float, mu: float, sigma: float):
     '''
     Gauss function used for fitting in the MAX-DOAS cloud classification
     calibration routine (color index CI and oxygen dimer O4).
     '''
-    return A0 + A * np.exp(-((x - mu)**2 / (2. * sigma**2)))
+    return offset + scale * np.exp(-((x - mu)**2 / (2. * sigma**2)))
 
 
 def get_daily_idc_before_after(dt: np.array, elev: np.array,
@@ -119,11 +119,17 @@ def get_idc(elev, select_elev, order='first'):
     return (scan_idc, elev_idc)
 
 
-def fill_masked_array(any_array, fillvalue=False):
+def fill_masked_array(any_array, fillvalue=False) -> np.ndarray:
+    '''
+    Make sure any array is a np.ndarray. If it is an instance of masked array,
+    use the given fill value to convert the masked array to a np.ndarray
+
+    @any_array
+    @fillvalue (optional)
+    '''
     if isinstance(any_array, np.ma.MaskedArray):
         return any_array.filled(fillvalue)
-    else:
-        return any_array
+    return any_array
 
 
 class MAXDOASCloudClassification():
@@ -189,7 +195,7 @@ class MAXDOASCloudClassification():
             errmsg = 'CI normalization value is None. Provide '
             errmsg += 'normalization_ci in the config '
             errmsg += 'or run the normalize_ci(...) function.'
-            self.print_log(errmsg, Exception=MDCCError)
+            self.print_log(errmsg, raise_exception=MDCCError)
 
     def check_o4_normalization(self):
         '''
@@ -199,7 +205,7 @@ class MAXDOASCloudClassification():
             errmsg = 'O4 normalization value is None. Provide '
             errmsg += 'normalization_o4 in the config '
             errmsg += 'or run the normalize_o4(...) function.'
-            self.print_log(errmsg, Exception=MDCCError)
+            self.print_log(errmsg, raise_exception=MDCCError)
 
     def check_classification_mask(self):
         '''
@@ -208,7 +214,7 @@ class MAXDOASCloudClassification():
         if self.classification_mask is None:
             errmsg = 'Classification_mask is not set. Run '
             errmsg += 'set_classification_mask(...)'
-            self.print_log(errmsg, Exception=MDCCError)
+            self.print_log(errmsg, raise_exception=MDCCError)
 
     def check_thresholds(self):
         '''
@@ -247,10 +253,10 @@ class MAXDOASCloudClassification():
         RETURNS
         '''
         self.check_shape(sza, elev)
-        sza_mask = (sza < self.config['classification_sza_range'][0])
-        sza_mask |= (sza > self.config['classification_sza_range'][1])
-        elev_mask = (elev < self.config['classification_elev_range'][0])
-        elev_mask |= (elev > self.config['classification_elev_range'][1])
+        sza_mask = sza < self.config['classification_sza_range'][0]
+        sza_mask |= sza > self.config['classification_sza_range'][1]
+        elev_mask = elev < self.config['classification_elev_range'][0]
+        elev_mask |= elev > self.config['classification_elev_range'][1]
         for ignore_elev in self.config['ignore_elev']:
             elev_mask |= (elev == ignore_elev)
         self.classification_mask = sza_mask | elev_mask
@@ -284,8 +290,8 @@ class MAXDOASCloudClassification():
         th_cfg = self.threshold_config
         sza_zenith = sza[zenith_idc]
         # Filter all values outside of defined SZA range
-        sza_filter = (sza_zenith < self.config['classification_sza_range'][0])
-        sza_filter |= (sza_zenith > self.config['classification_sza_range'][1])
+        sza_filter = sza_zenith < self.config['classification_sza_range'][0]
+        sza_filter |= sza_zenith > self.config['classification_sza_range'][1]
         sza_zenith[sza_filter] = np.nan
         # Calculation of SZA dependent or constant thresholds
         # for a given data set
@@ -303,8 +309,8 @@ class MAXDOASCloudClassification():
         for th_key in th_keys:
             th[th_key] = np.poly1d(th_cfg[th_key])(sza_zenith)
         # Spread is only valid in this SZA range
-        spread_sza_filter = (sza_zenith < self.config['valid_spread_sza_range'][0])
-        spread_sza_filter |= (sza_zenith > self.config['valid_spread_sza_range'][1])
+        spread_sza_filter = sza_zenith < self.config['valid_spread_sza_range'][0]
+        spread_sza_filter |= sza_zenith > self.config['valid_spread_sza_range'][1]
         th['AVG_SZA'][spread_sza_filter] = np.nan
         # Constant THs:
         th_keys = ['SPREAD_CI',  # Spread CI threshold
@@ -369,8 +375,8 @@ class MAXDOASCloudClassification():
         norm_bins = np.arange(*norm_bin_range, norm_bin_size)
         center_bins = 0.5 * (norm_bins[:-1] + norm_bins[1:])
         # First gauss fit to clip filtered values
-        sza_filter = (sza[zenith_idc] > self.config['normalize_ci_sza_range'][0])
-        sza_filter &= (sza[zenith_idc] < self.config['normalize_ci_sza_range'][1])
+        sza_filter = sza[zenith_idc] > self.config['normalize_ci_sza_range'][0]
+        sza_filter &= sza[zenith_idc] < self.config['normalize_ci_sza_range'][1]
         count_abs, _ = np.histogram(ci_norm[sza_filter], norm_bins)
         count_rel = count_abs / np.sum(count_abs)
         if plot_stream is not None:
@@ -380,12 +386,12 @@ class MAXDOASCloudClassification():
         # Check if CI values can be fitted with a normal distribution
         try:
             # Start values for fit
-            A0 = 0
-            A = np.nanmax(count_rel)
+            offset = 0
+            scale = np.nanmax(count_rel)
             mu = center_bins[np.argmax(count_rel)]
             sigma = 0.2
             fit_params, _ = curve_fit(gauss, center_bins, count_rel,
-                                      [A0, A, mu, sigma])
+                                      [offset, scale, mu, sigma])
         except RuntimeError:
             msg = 'Could not fit a gauss curve to the given frequency '
             msg += 'distribution of the color index. Please check radiance '
@@ -396,17 +402,15 @@ class MAXDOASCloudClassification():
             self.print_log(msg, raise_exception=ValueError)
         ###
         if method == 'gauss_fit':
-            '''
-            Method description:
-            Final gauss fit after clipping using fitted mu and sigma from
-            test fit to remove all values above mu + 1 * sigma
-            '''
-            ci_filter = (ci_norm < fit_params[2] + fit_params[3])
+            # Method description:
+            # Final gauss fit after clipping using fitted mu and sigma from
+            # test fit to remove all values above mu + 1 * sigma
+            ci_filter = ci_norm < fit_params[2] + fit_params[3]
             ci_selected = ci_norm[(ci_filter) & (sza_filter)]
             count_abs, _ = np.histogram(ci_selected, norm_bins)
             count_rel = count_abs / np.sum(count_abs)
             fit_params, _ = curve_fit(gauss, center_bins, count_rel,
-                                      [A0, A, mu, sigma])
+                                      [offset, scale, mu, sigma])
             normalization_ci = fit_params[2]
             if plot_stream is not None:
                 # ADD fitted calibration CI to plot.
@@ -414,15 +418,13 @@ class MAXDOASCloudClassification():
                 ax.plot(center_bins, fit_line, '-', color='r',
                         label='gauss fit')
         elif method == 'peak_finding':
-            '''
-            Method description:
-              1) Use find_peaks to find all local maxima in the color index
-                 frequency distribution.
-              2) Remove all peaks with a local maximum value below 10% of the
-                 global maximum value.
-              3) From the remaining peaks, select the one with in the lowest
-                 center_bin.
-            '''
+            # Method description:
+            #   1) Use find_peaks to find all local maxima in the color index
+            #      frequency distribution.
+            #   2) Remove all peaks with a local maximum value below 10% of the
+            #      global maximum value.
+            #   3) From the remaining peaks, select the one with in the lowest
+            #      center_bin.
             # Using count_rel from binning after only filtering for SZA
             peaks, _ = find_peaks(count_rel, prominence=0.05*np.max(count_rel))
             peak_filter = count_rel[peaks] > 0.1 * np.max(count_rel[peaks])
@@ -499,13 +501,13 @@ class MAXDOASCloudClassification():
         self.check_shape(sza, elev, o4_damf)
         # Perform O4 calibration only if CI classification did not raise flags
         # for broken clouds or cloud holes
-        cloud_mask = (cloud_type.main[:, 3] == 0)
-        cloud_mask &= (cloud_type.main[:, 4] == 0)
+        cloud_mask = cloud_type.main[:, 3] == 0
+        cloud_mask &= cloud_type.main[:, 4] == 0
         # Only for a given SZA range
         zenith_idc = get_idc(elev, self.config['zenith_elevation'],
                              order='last')
-        sza_mask = (sza[zenith_idc] > self.config['normalize_o4_sza_range'][0])
-        sza_mask &= (sza[zenith_idc] < self.config['normalize_o4_sza_range'][1])
+        sza_mask = sza[zenith_idc] > self.config['normalize_o4_sza_range'][0]
+        sza_mask &= sza[zenith_idc] < self.config['normalize_o4_sza_range'][1]
         finite_mask = np.isfinite(o4_damf[zenith_idc])
         o4_damf_norm = o4_damf[zenith_idc] - self.thresholds['O4_TH']
         o4_damf_norm = o4_damf_norm[sza_mask & cloud_mask & finite_mask]
@@ -518,13 +520,13 @@ class MAXDOASCloudClassification():
         count_rel = count_abs / np.sum(count_abs)
 
         # Start values for fit
-        A0 = 0
-        A = np.nanmax(count_rel)
+        offset = 0
+        scale = np.nanmax(count_rel)
         mu = center_bins[np.argmax(count_rel)]
         sigma = 0.2
 
         fit_params, _ = curve_fit(gauss, center_bins, count_rel,
-                                  [A0, A, mu, sigma])
+                                  [offset, scale, mu, sigma])
         normalization_o4 = fit_params[2]
         self.config['normalization_o4'] = normalization_o4
         if verbose:
@@ -550,6 +552,7 @@ class MAXDOASCloudClassification():
             plt.tight_layout()
             plot_stream.savefig(fig, dpi=200, bbox_inches='tight')
             plt.close()
+        return normalization_o4
 
     def calc_spread(self, values: np.array,
                     normalize_sza_dependence: bool=True):
@@ -674,39 +677,39 @@ class MAXDOASCloudClassification():
         # cloud classification
         cloud_type = MDCloudResult(nscans)
         # Flag 1: clear sky low aerosol (main category)
-        main1 = (ci_scaled >= self.thresholds['CI_TH'])
-        main1 &= (zenith_tsi < self.thresholds['TSI_TH'])
+        main1 = ci_scaled >= self.thresholds['CI_TH']
+        main1 &= zenith_tsi < self.thresholds['TSI_TH']
         main1 = fill_masked_array(main1)
         cloud_type.main[main1, 0] = 1
         # Flag 2: clear sky high aerosol (main category)
-        main2 = (ci_scaled < self.thresholds['CI_TH'])
-        main2 &= (zenith_tsi < self.thresholds['TSI_TH'])
-        main2 &= (ci_spread >= self.thresholds['SPREAD_CI'])
+        main2 = ci_scaled < self.thresholds['CI_TH']
+        main2 &= zenith_tsi < self.thresholds['TSI_TH']
+        main2 &= ci_spread >= self.thresholds['SPREAD_CI']
         main2 = fill_masked_array(main2)
         cloud_type.main[main2, 1] = 1
         # Flag 3: cloud holes (main category)
-        main3 = (ci_scaled >= self.thresholds['CI_TH'])
-        main3 &= (zenith_tsi >= self.thresholds['TSI_TH'])
+        main3 = ci_scaled >= self.thresholds['CI_TH']
+        main3 &= zenith_tsi >= self.thresholds['TSI_TH']
         main3 = fill_masked_array(main3)
         cloud_type.main[main3, 2] = 1
         # Flag 4: broken clouds (main category)
-        main4 = (ci_scaled < self.thresholds['CI_TH'])
-        main4 &= (zenith_tsi >= self.thresholds['TSI_TH'])
+        main4 = ci_scaled < self.thresholds['CI_TH']
+        main4 &= zenith_tsi >= self.thresholds['TSI_TH']
         main4 = fill_masked_array(main4)
         cloud_type.main[main4, 3] = 1
         # Flag 5: continuous clouds (main category)
-        main5 = (ci_scaled < self.thresholds['CI_TH'])
-        main5 &= (zenith_tsi < self.thresholds['TSI_TH'])
-        main5 &= (ci_spread < self.thresholds['SPREAD_CI'])
+        main5 = ci_scaled < self.thresholds['CI_TH']
+        main5 &= zenith_tsi < self.thresholds['TSI_TH']
+        main5 &= ci_spread < self.thresholds['SPREAD_CI']
         main5 = fill_masked_array(main5)
         cloud_type.main[main5, 4] = 1
         # Flag 6: constantly clear (sub category)
         sub1 = main1 | main2
-        sub1 &= (zenith_tsi < self.thresholds['TSI_CONST_TH'])
+        sub1 &= zenith_tsi < self.thresholds['TSI_CONST_TH']
         sub1 = fill_masked_array(sub1)
         cloud_type.sub[sub1, 0] = 1
         # Flag 7: constantly cloudy (sub category)
-        sub2 = main5 & (zenith_tsi < self.thresholds['TSI_CONST_TH'])
+        sub2 = main5 & zenith_tsi < self.thresholds['TSI_CONST_TH']
         sub2 = fill_masked_array(sub2)
         cloud_type.sub[sub2, 1] = 1
         return cloud_type
@@ -741,16 +744,16 @@ class MAXDOASCloudClassification():
         spread_o4 = self.calc_spread(o4_damf[zenith_idc[0]])
         ci_scaled = ci[zenith_idc] / self.config['normalization_ci']
         # Flag 6: fog
-        sub3 = (ci_scaled < self.thresholds['CI_TH'])
-        sub3 &= (spread_o4 < self.thresholds['SPREAD_O4'])
+        sub3 = ci_scaled < self.thresholds['CI_TH']
+        sub3 &= spread_o4 < self.thresholds['SPREAD_O4']
         sub3 = fill_masked_array(sub3)
         cloud_type.sub[sub3, 2] = 1
         # Flag 7: thick clouds
         o4_amf = o4_damf[zenith_idc] - self.config['normalization_o4']
         o4_th = self.thresholds['O4_TH'] + self.thresholds['O4_TH_OFFSET']
-        sub4 = (cloud_type.main[:, 3] >= 1)
-        sub4 |= (cloud_type.main[:, 4] >= 1)
-        sub4 &= (o4_amf > o4_th)
+        sub4 = cloud_type.main[:, 3] >= 1
+        sub4 |= cloud_type.main[:, 4] >= 1
+        sub4 &= o4_amf > o4_th
         sub4 = fill_masked_array(sub4)
         cloud_type.sub[sub4, 3] = 1
         return cloud_type
@@ -781,8 +784,8 @@ class MAXDOASCloudClassification():
         total_class = total_class.flatten()
         # Check for changes FRM4DOAS D2.2 ATBD section 5.3
         # Compare previous, current and next scan
-        warn1 = (total_class[:-2] != total_class[1:-1])
-        warn1 |= (total_class[1:-1] != total_class[2:])
+        warn1 = total_class[:-2] != total_class[1:-1]
+        warn1 |= total_class[1:-1] != total_class[2:]
         warn1_first = total_class[0] != total_class[1]
         warn1_last = total_class[-2] != total_class[-1]
         warn1 = np.insert(warn1, [0, -1], [warn1_first, warn1_last])
