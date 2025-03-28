@@ -26,7 +26,7 @@ from md_cloud_classification.toolbox import MDCCError, time_conversions as tc
 from md_cloud_classification.toolbox.md_cloud_result import MDCloudResult
 
 
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 
 
 def gauss(x: float, A0: float, A: float, mu: float, sigma: float):
@@ -837,11 +837,11 @@ class MAXDOASCloudClassification():
         self.check_shape(sza, elev, ci, o4_damf, dt, lon)
         self.gen_thresholds(sza, elev)
         self.set_classification_mask(sza, elev)
-        self.normalize_ci(sza, ci, elev, plot_stream=plot_stream,
+        self.normalize_ci(sza, elev, ci, plot_stream=plot_stream,
                           verbose=verbose)
-        cloud_type = self.classify_ci_cloud(dt, ci, elev, lon)
+        cloud_type = self.classify_ci_cloud(elev, ci, dt, lon)
         self.normalize_o4(sza, elev, o4_damf, cloud_type,
                           plot_stream=plot_stream, verbose=verbose)
-        cloud_type = self.classify_o4_cloud(cloud_type, elev, o4_damf, ci)
-        cloud_type = self.get_warning_flags(cloud_type, dt, elev)
+        cloud_type = self.classify_o4_cloud(elev, ci, o4_damf, cloud_type)
+        cloud_type = self.get_warning_flags(elev, dt, cloud_type)
         return cloud_type
