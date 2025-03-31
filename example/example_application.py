@@ -60,6 +60,7 @@ def load_mapa_converter_data(mapa_conv_fn):
     vec_dt = np.vectorize(mapancdate_to_datetime)
     data = {}
     # Little specialities in the validation data set
+    # Mainz == Dory, other stations by site name
     if 'Dory' in mapa_conv_fn:
         o4_scd_name = 'o4fix_fw352to387nm'
     else:
@@ -94,12 +95,12 @@ with open(general_cfg_fn, 'r') as cfg:
 with open(threshold_cfg_fn, 'r') as cfg:
     thresholds_config = yaml.load(cfg, Loader=yaml.SafeLoader)
 
-calibration_report_fn = r'D:\\test.pdf'
+calibration_report_fn = r'REPORT_PDF_FILE_LOCATION'
 
 # Provide a dictionary with a valid MAPA converter file here:
-datadir = r'D:\sziegler\studies\sziegler\cloud_classification\code_von_lucas\data'
+datadir = r'FRM4DOAS_DATA_DIR'
 data_fns = file_tools.get_filelist(datadir, recursive=True,
-                                   must_contain=['Dory', '.nc'])
+                                   must_contain=['FILEFILTER', '.nc'])
 data = load_mapa_converter_data(data_fns[0])
 
 cloud_class = MAXDOASCloudClassification(config, thresholds_config)
