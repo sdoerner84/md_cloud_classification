@@ -28,14 +28,6 @@ def frm4doasdate_to_datetime(fracday, year):
     return datetime(year, 1, 1) + timedelta(days=fracday - 1)
 
 
-def mapancdate_to_datetime(longdate):
-    if longdate == -1:
-        # Invalid year: 65535
-        # Invalid day: -1
-        return None
-    return datetime.strptime(f'{longdate:14d}', '%Y%m%d%H%M%S')
-
-
 def load_frm4doas_data(frm4doas_fn, o4_vcd=1.237656277109714e43):
     vec_dt = np.vectorize(frm4doasdate_to_datetime)
     data = {}
@@ -56,35 +48,6 @@ def load_frm4doas_data(frm4doas_fn, o4_vcd=1.237656277109714e43):
     return data
 
 
-def load_mapa_converter_data(mapa_conv_fn):
-    vec_dt = np.vectorize(mapancdate_to_datetime)
-    data = {}
-    # Little specialities in the validation data set
-    if 'Dory' in mapa_conv_fn:
-        o4_scd_name = 'o4fix_fw352to387nm'
-    else:
-        o4_scd_name = 'o4_fw352to387nm'
-    if 'BREMEN' in mapa_conv_fn:
-        rad390_name = 'rad_387'
-    else:
-        rad390_name = 'rad_390'
-    with Dataset(mapa_conv_fn, 'r') as ncin:
-        data['sza'] = ncin['measurement_info/sza'][:]
-        data['elev'] = ncin['measurement_info/elevation_angle'][:]
-        data['rad330'] = ncin['radiance/rad_330/value'][:]
-        data['rad390'] = ncin[f'radiance/{rad390_name}/value'][:]
-        data['dtraw'] = ncin['measurement_info/time'][:]
-        data['o4_scd'] = ncin[f'aerosol/{o4_scd_name}/value'][:]
-        data['o4_vcd'] = ncin['auxiliary/o4vcd'][:]
-        data['lon'] = ncin['instrument_location/longitude'][:]
-    data['dt'] = vec_dt(data['dtraw'])
-    data['ci'] = data['rad330'] / data['rad390']
-    data['o4_damf'] = data['o4_scd'] / data['o4_vcd'][:, None]
-    data['elev'] = np.tile(data['elev'], (data['sza'].shape[0], 1))
-    data['lon'] = np.tile(data['lon'], (data['sza'].shape[1], 1)).transpose()
-    return data
-
-
 general_cfg_fn = 'example_config.yml'
 threshold_cfg_fn = '../config/default_thresholds.yml'
 
@@ -100,7 +63,7 @@ calibration_report_fn = r'D:\\test.pdf'
 datadir = r'D:\sziegler\studies\sziegler\cloud_classification\code_von_lucas\data'
 data_fns = file_tools.get_filelist(datadir, recursive=True,
                                    must_contain=['Dory', '.nc'])
-data = load_mapa_converter_data(data_fns[0])
+data = load_frm4doas_data(data_fns[0])
 
 cloud_class = MAXDOASCloudClassification(config, thresholds_config)
 with PdfPages(calibration_report_fn) as pdfout:
@@ -117,8 +80,47 @@ with PdfPages(calibration_report_fn) as pdfout:
                                                data['o4_damf'], cloud_type)
     cloud_type = cloud_class.get_warning_flags(data['elev'], data['dt'],
                                                cloud_type)
-    # Alternatively call (all steps are performed as above):
-    # cloud_class.classify_all(data['sza'], data['elev'], data['ci'],
-    #                          data['o4_damf'], data['dt'], data['lon'],
-    #                          pdfout, verbose=True)
-print(cloud_type)
+
+cloud_types = {'main': {'long_name': "First column - clear sky with low aerosols,\n"
+                                     "Second column - clear sky with high aerosols,\n"
+                                     "Third column - cloud holes,\n"
+                                     "Fourth column - broken clouds,\n"
+                                     "Fifth column - continuous clouds,\n"
+                                     "Sixth column - None\n"
+                                     "Seventh column - None\n"
+                                     "Eighth column - None",
+                        'ncvar': 'CLOUD/main_classification'},
+               'sub': {'long_name': "First column - constantly clear,\n"
+                                    "Second column - constantly cloudy,\n"
+                                    "Third column - fog,\n"
+                                    "Fourth column - optically thick clouds,\n"
+                                    "Fifth column - None,\n"
+                                    "Sixth column - None\n"
+                                    "Seventh column - None\n"
+                                    "Eighth column - None",
+                       'ncvar': 'CLOUD/sub_classification'},
+               'warn': {'long_name': "First column - classification change flag,\n"
+                                     "Second column - less than two zenith measurements in a scan,\n"
+                                     "Third column - long scan time flag,\n"
+                                     "Fourth column - no cloud classification,\n"
+                                     "Fifth column - None,\n"
+                                     "Sixth column - None\n"
+                                     "Seventh column - None\n"
+                                     "Eighth column - None",
+                        'ncvar': 'CLOUD/warn_classification'},
+               }
+with Dataset(data_fns[0], 'a') as ncout:
+    if 'CLOUD' not in ncout.groups:
+        if 'dim_8bit' not in ncout.dimensions:
+            ncout.createDimension('dim_8bit', 8)
+        for key, item in cloud_types.items():
+            dim = ('dim_sequences', 'dim_8bit')
+            var_cc = ncout.createVariable(item['ncvar'],
+                                          datatype='i4',
+                                          dimensions=dim,
+                                          fill_value=0)
+            var_cc.setncattr('long_name', item['long_name'])
+    for key, item in cloud_types.items():
+        ncvar = ncout[item['ncvar']]
+        ncvar[:] = cloud_type.__dict__[key]
+
