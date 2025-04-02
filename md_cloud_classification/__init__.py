@@ -26,7 +26,7 @@ from md_cloud_classification.toolbox import MDCCError, time_conversions as tc
 from md_cloud_classification.toolbox.md_cloud_result import MDCloudResult
 
 
-__version__ = '1.0.3'
+__version__ = '1.0.4'
 
 
 def gauss(x: float, offset: float, scale: float, mu: float, sigma: float):
@@ -709,7 +709,8 @@ class MAXDOASCloudClassification():
         sub1 = fill_masked_array(sub1)
         cloud_type.sub[sub1, 0] = 1
         # Flag 7: constantly cloudy (sub category)
-        sub2 = main5 & zenith_tsi < self.thresholds['TSI_CONST_TH']
+        sub2 = main5
+        sub2 &= zenith_tsi < self.thresholds['TSI_CONST_TH']
         sub2 = fill_masked_array(sub2)
         cloud_type.sub[sub2, 1] = 1
         return cloud_type
