@@ -4,6 +4,7 @@ Created on 22.01.2021
 @author: B.Lauster
 '''
 import os
+from collections import defaultdict
 
 
 def get_filelist(basepath, recursive=True, must_contain=[], not_contain=[]):
@@ -40,3 +41,33 @@ def get_filelist(basepath, recursive=True, must_contain=[], not_contain=[]):
             final_list.append(abs_file)
     final_list.sort()
     return final_list
+
+
+def filelist_to_str(filelist: list, grouping: bool=False) -> str:
+    '''
+    Convert a list of filesnames into a nicely formatted string
+
+    @filelist
+    @grouping (default=False) if set true, the string will be ordered by
+        directory and only displays the relative filename within a given
+        directory. Otherwise the output is just a line-separated list of
+        all filenames
+    '''
+    if not grouping:
+        return '\n'.join(filelist)
+    # Use a dictionary to sort files to
+    directories = defaultdict(list)
+
+    # Group all files by their folder
+    for filename in filelist:
+        directory = os.path.dirname(filename)
+        directories[directory].append(filename)
+
+    # Create string based on ordered folders
+    out = []
+    for directory, filenames in directories.items():
+        out.append(f"{directory}")
+        for filename in filenames:
+            out.append(f".{os.sep}{os.path.basename(filename)}")
+        out.append("")
+    return '\n'.join(out)

@@ -45,3 +45,13 @@ def get_unix_epoch(dt):
     if dt is None:
         return np.nan
     return (dt - datetime(1970, 1, 1)).total_seconds()
+
+
+def get_dt_from_unix_epoch(epoch):
+    '''
+    Get datetime from a given UNIX EPOCH. UNIX EPOCH is the total amound of
+    seconds since 1970-01-01 00:00:00
+    '''
+    if epoch is None:
+        return None
+    return (datetime(1970, 1, 1) + timedelta(seconds=epoch))
