@@ -26,7 +26,7 @@ from md_cloud_classification.toolbox import MDCCError, time_conversions as tc
 from md_cloud_classification.toolbox.md_cloud_result import MDCloudResult
 
 
-__version__ = '1.0.4'
+__version__ = '1.1.0'
 
 
 def gauss(x: float, offset: float, scale: float, mu: float, sigma: float):
@@ -501,8 +501,8 @@ class MAXDOASCloudClassification():
         self.check_shape(sza, elev, o4_damf)
         # Perform O4 calibration only if CI classification did not raise flags
         # for broken clouds or cloud holes
-        cloud_mask = cloud_type.main[:, 3] == 0
-        cloud_mask &= cloud_type.main[:, 4] == 0
+        cloud_mask = cloud_type.main['values'][:, 3] == 0
+        cloud_mask &= cloud_type.main['values'][:, 4] == 0
         # Only for a given SZA range
         zenith_idc = get_idc(elev, self.config['zenith_elevation'],
                              order='last')
@@ -680,39 +680,39 @@ class MAXDOASCloudClassification():
         main1 = ci_scaled >= self.thresholds['CI_TH']
         main1 &= zenith_tsi < self.thresholds['TSI_TH']
         main1 = fill_masked_array(main1)
-        cloud_type.main[main1, 0] = 1
+        cloud_type.main['values'][main1, 0] = 1
         # Flag 2: clear sky high aerosol (main category)
         main2 = ci_scaled < self.thresholds['CI_TH']
         main2 &= zenith_tsi < self.thresholds['TSI_TH']
         main2 &= ci_spread >= self.thresholds['SPREAD_CI']
         main2 = fill_masked_array(main2)
-        cloud_type.main[main2, 1] = 1
+        cloud_type.main['values'][main2, 1] = 1
         # Flag 3: cloud holes (main category)
         main3 = ci_scaled >= self.thresholds['CI_TH']
         main3 &= zenith_tsi >= self.thresholds['TSI_TH']
         main3 = fill_masked_array(main3)
-        cloud_type.main[main3, 2] = 1
+        cloud_type.main['values'][main3, 2] = 1
         # Flag 4: broken clouds (main category)
         main4 = ci_scaled < self.thresholds['CI_TH']
         main4 &= zenith_tsi >= self.thresholds['TSI_TH']
         main4 = fill_masked_array(main4)
-        cloud_type.main[main4, 3] = 1
+        cloud_type.main['values'][main4, 3] = 1
         # Flag 5: continuous clouds (main category)
         main5 = ci_scaled < self.thresholds['CI_TH']
         main5 &= zenith_tsi < self.thresholds['TSI_TH']
         main5 &= ci_spread < self.thresholds['SPREAD_CI']
         main5 = fill_masked_array(main5)
-        cloud_type.main[main5, 4] = 1
+        cloud_type.main['values'][main5, 4] = 1
         # Flag 6: constantly clear (sub category)
         sub1 = main1 | main2
         sub1 &= zenith_tsi < self.thresholds['TSI_CONST_TH']
         sub1 = fill_masked_array(sub1)
-        cloud_type.sub[sub1, 0] = 1
+        cloud_type.sub['values'][sub1, 0] = 1
         # Flag 7: constantly cloudy (sub category)
         sub2 = main5
         sub2 &= zenith_tsi < self.thresholds['TSI_CONST_TH']
         sub2 = fill_masked_array(sub2)
-        cloud_type.sub[sub2, 1] = 1
+        cloud_type.sub['values'][sub2, 1] = 1
         return cloud_type
 
     def classify_o4_cloud(self, elev: np.array, ci: np.array,
@@ -748,15 +748,15 @@ class MAXDOASCloudClassification():
         sub3 = ci_scaled < self.thresholds['CI_TH']
         sub3 &= spread_o4 < self.thresholds['SPREAD_O4']
         sub3 = fill_masked_array(sub3)
-        cloud_type.sub[sub3, 2] = 1
+        cloud_type.sub['values'][sub3, 2] = 1
         # Flag 7: thick clouds
         o4_amf = o4_damf[zenith_idc] - self.config['normalization_o4']
         o4_th = self.thresholds['O4_TH'] + self.thresholds['O4_TH_OFFSET']
-        sub4 = cloud_type.main[:, 3] >= 1
-        sub4 |= cloud_type.main[:, 4] >= 1
+        sub4 = cloud_type.main['values'][:, 3] >= 1
+        sub4 |= cloud_type.main['values'][:, 4] >= 1
         sub4 &= o4_amf > o4_th
         sub4 = fill_masked_array(sub4)
-        cloud_type.sub[sub4, 3] = 1
+        cloud_type.sub['values'][sub4, 3] = 1
         return cloud_type
 
     def get_warning_flags(self, elev: np.array, dt: np.array,
@@ -779,7 +779,8 @@ class MAXDOASCloudClassification():
         self.check_classification_mask()
         self.check_shape(elev, dt)
         # 1) Change of total cloud flag:
-        total_cloud_type = np.append(cloud_type.main, cloud_type.sub, axis=1)
+        total_cloud_type = np.append(cloud_type.main['values'],
+                                     cloud_type.sub['values'], axis=1)
         # Derive number corresponding the the n-bit cloud flag
         total_class = np.packbits(total_cloud_type, axis=1).view(np.uint16)
         total_class = total_class.flatten()
@@ -790,14 +791,14 @@ class MAXDOASCloudClassification():
         warn1_first = total_class[0] != total_class[1]
         warn1_last = total_class[-2] != total_class[-1]
         warn1 = np.insert(warn1, [0, -1], [warn1_first, warn1_last])
-        cloud_type.warn[warn1, 0] = 1
+        cloud_type.warn['values'][warn1, 0] = 1
 
         # 2) Mark scans with less than two zenith elevations in the scan
         masked_elev = np.ma.masked_where(self.classification_mask, elev)
         mark_zenith = np.zeros_like(masked_elev)
         mark_zenith[masked_elev == self.config['zenith_elevation']] = 1
         warn2 = np.where(np.sum(mark_zenith, axis=1) != 2)
-        cloud_type.warn[warn2, 1] = 1
+        cloud_type.warn['values'][warn2, 1] = 1
 
         # 3) Mark scans with an extraordinary long time difference between
         # start and end of the scan.
@@ -807,11 +808,11 @@ class MAXDOASCloudClassification():
         dt_spread = self.calc_spread(masked_dt, normalize_sza_dependence=False)
         warn3 = dt_spread > self.config['delta_time_scan']
         warn3 = fill_masked_array(warn3)
-        cloud_type.warn[warn3, 2] = 1
+        cloud_type.warn['values'][warn3, 2] = 1
 
         # 4) Mark scans where the main cloud classification was not performed
-        warn4 = np.sum(cloud_type.main, axis=1) == 0
-        cloud_type.warn[warn4, 3] = 1
+        warn4 = np.sum(cloud_type.main['values'], axis=1) == 0
+        cloud_type.warn['values'][warn4, 3] = 1
         return cloud_type
 
     def classify_all(self, sza: np.array, elev: np.array, ci: np.array,
