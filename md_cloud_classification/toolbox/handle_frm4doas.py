@@ -78,8 +78,9 @@ def load_frm4doas_data(frm4doas_fn: str, read_cloudflags: bool=False) -> dict:
     result['dt'] = vec_dt(result['fracday'], result['year'])
     result['epoch'] = vec_epoch(result['dt'])
     np.ma.set_fill_value(result['dt'], -1)
-    result['lon'] = np.repeat(result['lon'], result['dt'].size).reshape(result['dt'].shape)
-    result['lat'] = np.repeat(result['lat'], result['dt'].size).reshape(result['dt'].shape)
+    if result['lon'].size != result['dt'].size:
+        result['lon'] = np.repeat(result['lon'], result['dt'].size).reshape(result['dt'].shape)
+        result['lat'] = np.repeat(result['lat'], result['dt'].size).reshape(result['dt'].shape)
     return result
 
 
