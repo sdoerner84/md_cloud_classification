@@ -317,12 +317,16 @@ class FRM4DOASCloudResultPlotter():
         self.pdfstream.savefig(fig)
         plt.close(fig)
 
-    def create_overview_plot(self, flag_types: list=None):
+    def create_overview_plot(self, flag_types: list=None, **kwargs):
         '''
         Cloud classification overview plot
 
         @flag_types (default=None) can be any sublist of available cloud types
             being main, sub and warn (see MDCloudResult.keys)
+        @kwargs:
+            custom_datelim: tuple with two values for having custom date limits
+                            in the overview plot, default is time range in
+                            self.data +/- 2 days
         '''
         if flag_types is None:
             flag_types = self.cloud_type.keys
@@ -345,6 +349,8 @@ class FRM4DOASCloudResultPlotter():
             dates.append(current_day.replace(hour=12))
             dates_seqs.append(valid_seq)
             current_day = next_day
+        datelim = kwargs.get('custom_datelim', (dates[0] - timedelta(days=2),
+                                                dates[-1] + timedelta(days=2)))
 
         fig, axes = plt.subplots(figsize=(10, 2*n_types), nrows=n_types,
                                  sharex=True)
@@ -393,8 +399,7 @@ class FRM4DOASCloudResultPlotter():
             axes[type_idx].grid(ls=':', color='gray')
         axes[0].set_title('Cloud classification overview')
         axes[-1].set_xlabel('Date')
-        axes[-1].set_xlim([dates[0] - timedelta(days=2),
-                           dates[-1] + timedelta(days=2)])
+        axes[-1].set_xlim(datelim)
         axes[-1].xaxis.set_minor_locator(mdates.DayLocator(interval=1))
         axes[-1].xaxis.set_major_locator(mdates.DayLocator(interval=7))
         axes[-1].xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
